@@ -74,10 +74,4 @@ The script is organized into the following main parts:
 5.  **Sequence Generation:** Contains the `generate_sequences` function using the trained CVAE decoder and the target metadata.
 6.  **Filtering:** Generates candidate sequences, uses the Stability Predictor to assess them, and prints the stable candidates.
 
-## Potential Improvements / Future Work
 
-* **Hyperparameter Tuning:** Optimize `max_len`, `latent_dim`, learning rates, model architecture (layer sizes, filters), epochs, and batch sizes using techniques like Keras Tuner or Optuna.
-* **Generation Sampling:** Explore alternative decoding strategies beyond `argmax` (e.g., temperature sampling, top-k sampling) to potentially increase the diversity of generated sequences.
-* **Evaluation:** Implement more robust evaluation metrics for both the predictor (e.g., MAE, R-squared on a hold-out test set) and the CVAE (e.g., reconstruction quality metrics, perplexity).
-* **Target Metadata Strategy:** Develop more sophisticated methods for choosing `target_metadata`, possibly based on multi-objective optimization or analysis of the Pareto front for desired properties in the original dataset.
-* **Structural Considerations:** Integrate structural prediction tools (like AlphaFold) as a post-generation filtering step for more rigorous stability/functional assessment (computationally intensive).
