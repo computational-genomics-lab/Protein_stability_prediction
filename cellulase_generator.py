@@ -12,16 +12,16 @@ import tensorflow.keras.backend as K
 
 ### Configuration ###
 MAX_LEN = 500       # Maximum sequence length for padding/truncating
-LATENT_DIM = 64     # Dimensionality of the latent space
-EPOCHS_PREDICTOR = 20 # Training epochs for the stability predictor
-EPOCHS_CVAE = 20     # Maximum training epochs for the CVAE (adjust as needed)
+LATENT_DIM = 128     # Dimensionality of the latent space
+EPOCHS_PREDICTOR = 10 # Training epochs for the stability predictor
+EPOCHS_CVAE = 10     # Maximum training epochs for the CVAE (adjust as needed)
 BATCH_SIZE = 64      # Batch size for training
 TEST_SPLIT_RATIO = 0.2
 VALIDATION_SPLIT_RATIO = 0.15 # Used within CVAE training
-EARLY_STOPPING_PATIENCE = 10
-REDUCE_LR_PATIENCE = 5
+EARLY_STOPPING_PATIENCE = 15
+REDUCE_LR_PATIENCE = 7
 KL_WEIGHT = 1.0 # Weight for KL divergence term in VAE loss (can be tuned)
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.0005
 CLIPNORM = 1.0      # Gradient clipping norm
 
 ### Helper Functions ###
@@ -172,6 +172,52 @@ metadata = df[meta_features_cols].values
 targets = df[target_col].values
 n_meta_features = metadata.shape[1]
 
+# --- Median values for target metadata  ---
+
+print("Calculating median metadata for stable proteins...")
+
+# Define the stability threshold
+STABILITY_THRESHOLD = 40 # Or maybe even lower, like 20, for more confidence
+
+# Define the columns for which you need median values (must match meta_features_cols later!)
+# Make sure these columns exist in 'df' after cleaning!
+cols_for_median = [
+    'mol_wt', 'aromaticity', 'pi', 'chrg', 'gravy',
+    'molar_extinct1', 'molar_extinct2',
+    'alpha', 'beta', 'random_coil',
+    'flexibility_mean'
+]
+target_col_name = 'instability index' # Make sure this matches your column name
+
+# Filter the DataFrame for stable proteins
+stable_df = df[df[target_col_name] < STABILITY_THRESHOLD].copy()
+
+if stable_df.empty:
+    print(f"Warning: No proteins found with instability < {STABILITY_THRESHOLD}. Check data or threshold.")
+    # Handle this case: maybe use the overall median, or a specific example known to be stable
+    # For now, let's calculate overall median as a fallback
+    median_stable_meta = df[cols_for_median].median()
+    print("Using OVERALL median metadata as fallback.")
+else:
+    # Calculate the median for each column
+    median_stable_meta = stable_df[cols_for_median].median()
+    print(f"Median metadata for proteins with instability < {STABILITY_THRESHOLD}:")
+    print(median_stable_meta)
+
+# --- Use these median values for generation ---
+target_metadata_example = median_stable_meta.tolist()
+
+# --- END of median calculation section ---
+
+# Now, continue with the rest of your script (scaling, splitting, models...)
+# Make sure the meta_features_cols used for scaling MATCHES cols_for_median
+meta_features_cols = cols_for_median # Ensure consistency
+
+# ... (rest of your script, including the assertion)
+assert len(target_metadata_example) == len(meta_features_cols), \
+    f"Length mismatch: target_metadata ({len(target_metadata_example)}) vs meta_features_cols ({len(meta_features_cols)})"
+
+
 # --- Sequence Encoding (AFTER final filtering) ---
 print("   - Encoding Sequences...")
 # Define amino acid vocabulary and mapping using the *cleaned* sequences
@@ -273,15 +319,15 @@ seq_input_cvae = layers.Input(shape=(MAX_LEN, vocab_size), name="cvae_seq_input"
 meta_input_cvae = layers.Input(shape=(n_meta_features,), name="cvae_meta_input")
 
 # Combined input processing for encoder
-x_enc = layers.Conv1D(64, 5, activation='relu', padding='same')(seq_input_cvae)
+x_enc = layers.Conv1D(128, 5, activation='relu', padding='same')(seq_input_cvae)
 x_enc = layers.MaxPooling1D(2)(x_enc) # -> MAX_LEN / 2
-x_enc = layers.Conv1D(128, 3, activation='relu', padding='same')(x_enc)
+x_enc = layers.Conv1D(256, 3, activation='relu', padding='same')(x_enc)
 x_enc = layers.MaxPooling1D(2)(x_enc) # -> MAX_LEN / 4
 x_enc = layers.Flatten()(x_enc)
 
 # Concatenate flattened sequence features with metadata
 concat_enc = layers.concatenate([x_enc, meta_input_cvae])
-hidden_enc = layers.Dense(128, activation='relu')(concat_enc) # Intermediate dense layer
+hidden_enc = layers.Dense(256, activation='relu')(concat_enc) # Intermediate dense layer
 
 # Latent space parameters
 z_mean = layers.Dense(LATENT_DIM, name='z_mean')(hidden_enc)
@@ -301,14 +347,14 @@ decoder_input_meta = layers.Input(shape=(n_meta_features,), name="decoder_meta_i
 concat_dec = layers.concatenate([decoder_input_latent, decoder_input_meta])
 
 # Calculate the shape needed before reshaping (depends on ConvTranspose layers)
-decoder_dense_units = (MAX_LEN // 4) * 128 # Example filter size
+decoder_dense_units = (MAX_LEN // 4) * 256 # Example filter size
 
 x_dec = layers.Dense(decoder_dense_units, activation='relu')(concat_dec)
-x_dec = layers.Reshape((MAX_LEN // 4, 128))(x_dec) # Reshape to (timesteps, features)
+x_dec = layers.Reshape((MAX_LEN // 4, 256))(x_dec) # Reshape to (timesteps, features)
 
 # Upsample using Transposed Convolutions
-x_dec = layers.Conv1DTranspose(128, 5, strides=2, padding='same', activation='relu')(x_dec) # -> MAX_LEN / 2
-x_dec = layers.Conv1DTranspose(64, 5, strides=2, padding='same', activation='relu')(x_dec)  # -> MAX_LEN
+x_dec = layers.Conv1DTranspose(256, 5, strides=2, padding='same', activation='relu')(x_dec) # -> MAX_LEN / 2
+x_dec = layers.Conv1DTranspose(128, 5, strides=2, padding='same', activation='relu')(x_dec)  # -> MAX_LEN
 
 # Final layer to get back to vocab dimension with softmax activation
 decoder_output = layers.Conv1D(vocab_size, 3, activation='softmax', padding='same', name='decoder_output')(x_dec)
@@ -428,12 +474,7 @@ def generate_sequences(n_samples, target_meta_unscaled, decoder_model, scaler_ob
 
 
 # --- Example Generation ---
-target_metadata_example = [
-    45000, 0.10, 5.0, -10, -0.5, # Basic properties
-    60000, 20000,                # Molar extinction coefficients
-    0.4, 0.2, 0.4,               # Secondary structure fractions
-    0.5                          # Flexibility mean
-]
+
 assert len(target_metadata_example) == n_meta_features, \
     f"Length mismatch: target_metadata has {len(target_metadata_example)}, expected {n_meta_features}"
 
@@ -469,5 +510,3 @@ stable_scores = [predicted_stabilities[i][0] for i in stable_sequences_indices]
 print(f"\nFound {len(stable_sequences)} sequences predicted to be stable (Instability Index < {stability_threshold}):")
 for i, seq in enumerate(stable_sequences[:5]): # Display top 5
     print(f"  Score: {stable_scores[i]:.2f} | Seq: {seq[:60]}...")
-
-print("\nProcess complete.")
