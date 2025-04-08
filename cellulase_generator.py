@@ -13,8 +13,8 @@ import tensorflow.keras.backend as K
 ### Configuration ###
 MAX_LEN = 500       # Maximum sequence length for padding/truncating
 LATENT_DIM = 128     # Dimensionality of the latent space
-EPOCHS_PREDICTOR = 10 # Training epochs for the stability predictor
-EPOCHS_CVAE = 10     # Maximum training epochs for the CVAE (adjust as needed)
+EPOCHS_PREDICTOR = 50 # Training epochs for the stability predictor
+EPOCHS_CVAE = 200     # Maximum training epochs for the CVAE (adjust as needed)
 BATCH_SIZE = 64      # Batch size for training
 TEST_SPLIT_RATIO = 0.2
 VALIDATION_SPLIT_RATIO = 0.15 # Used within CVAE training
@@ -114,7 +114,7 @@ def sampling(args):
 ### Data Loading and Preprocessing ###
 
 print("1. Loading data...")
-df = pd.read_csv('Bacterial_analysis.csv')
+df = pd.read_csv('Fungal_analysis.csv')
 print(f"Initial rows: {len(df)}")
 
 # --- Initial Sequence Cleaning ---
@@ -124,6 +124,15 @@ initial_count = len(df)
 df = df.dropna(subset=['seq'])
 df = df[df['seq'].apply(lambda x: isinstance(x, str))]
 print(f"Removed {initial_count - len(df)} rows with invalid 'seq' entries. Rows remaining: {len(df)}")
+
+# --- Finding statistics of the sequences ---
+'''
+# Create a new column for sequence lengths
+df['seq_len'] = df['seq'].apply(len)
+
+# Summary statistics
+print(df['seq_len'].describe())
+'''
 
 # --- Metadata Parsing and Feature Engineering ---
 print("3. Parsing and Processing Metadata...")
@@ -508,5 +517,16 @@ stable_sequences = [generated_seqs[i] for i in stable_sequences_indices]
 stable_scores = [predicted_stabilities[i][0] for i in stable_sequences_indices]
 
 print(f"\nFound {len(stable_sequences)} sequences predicted to be stable (Instability Index < {stability_threshold}):")
+
+top_stable_sequences = []
+
 for i, seq in enumerate(stable_sequences[:5]): # Display top 5
     print(f"  Score: {stable_scores[i]:.2f} | Seq: {seq[:60]}...")
+    top_stable_sequences.append(f"{stable_scores[i]:.2f} | Seq: {seq}")
+
+    print(top_stable_sequences)
+
+
+with open('fungal_sequences.txt', 'w') as file:
+    for sequence in top_stable_sequences:
+        file.write(f"{sequence}\n")
