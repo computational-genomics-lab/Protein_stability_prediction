@@ -7,14 +7,12 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, utils, callbacks, losses
 from tensorflow.keras.optimizers import Adam
 import tensorflow.keras.backend as K
-# Note: BioPython import was present but unused in the original code.
-# from Bio import SeqIO # Example if needed later
 
 ### Configuration ###
 MAX_LEN = 500       # Maximum sequence length for padding/truncating
 LATENT_DIM = 128     # Dimensionality of the latent space
 EPOCHS_PREDICTOR = 50 # Training epochs for the stability predictor
-EPOCHS_CVAE = 200     # Maximum training epochs for the CVAE (adjust as needed)
+EPOCHS_CVAE = 200     # Maximum training epochs for the CVAE 
 BATCH_SIZE = 64      # Batch size for training
 TEST_SPLIT_RATIO = 0.2
 VALIDATION_SPLIT_RATIO = 0.15 # Used within CVAE training
@@ -125,14 +123,6 @@ df = df.dropna(subset=['seq'])
 df = df[df['seq'].apply(lambda x: isinstance(x, str))]
 print(f"Removed {initial_count - len(df)} rows with invalid 'seq' entries. Rows remaining: {len(df)}")
 
-# --- Finding statistics of the sequences ---
-'''
-# Create a new column for sequence lengths
-df['seq_len'] = df['seq'].apply(len)
-
-# Summary statistics
-print(df['seq_len'].describe())
-'''
 
 # --- Metadata Parsing and Feature Engineering ---
 print("3. Parsing and Processing Metadata...")
@@ -213,16 +203,10 @@ else:
     print(f"Median metadata for proteins with instability < {STABILITY_THRESHOLD}:")
     print(median_stable_meta)
 
-# --- Use these median values for generation ---
 target_metadata_example = median_stable_meta.tolist()
 
-# --- END of median calculation section ---
+meta_features_cols = cols_for_median 
 
-# Now, continue with the rest of your script (scaling, splitting, models...)
-# Make sure the meta_features_cols used for scaling MATCHES cols_for_median
-meta_features_cols = cols_for_median # Ensure consistency
-
-# ... (rest of your script, including the assertion)
 assert len(target_metadata_example) == len(meta_features_cols), \
     f"Length mismatch: target_metadata ({len(target_metadata_example)}) vs meta_features_cols ({len(meta_features_cols)})"
 
@@ -266,7 +250,6 @@ print(f"Train set size: {X_seq_train.shape[0]}")
 print(f"Test set size: {X_seq_test.shape[0]}")
 
 # --- Data Validation Checks (Post-Split) ---
-# Less critical now as major cleaning happened before, but good practice
 print("7. Final data validation checks (NaNs/Infs in splits)...")
 datasets = {'X_seq_train': X_seq_train, 'X_meta_train': X_meta_train, 'y_train': y_train,
             'X_seq_test': X_seq_test, 'X_meta_test': X_meta_test, 'y_test': y_test}
@@ -276,7 +259,7 @@ for name, data in datasets.items():
     if nans > 0 or infs > 0:
         print(f"   WARNING: Found {nans} NaNs / {infs} Infs in {name} AFTER split. Applying nan_to_num.")
         datasets[name] = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
-# Update variables if changed
+
 X_seq_train, X_meta_train, y_train = datasets['X_seq_train'], datasets['X_meta_train'], datasets['y_train']
 X_seq_test, X_meta_test, y_test = datasets['X_seq_test'], datasets['X_meta_test'], datasets['y_test']
 
@@ -312,7 +295,7 @@ history_predictor = predictor.fit(
     validation_data=([X_seq_test, X_meta_test], y_test),
     epochs=EPOCHS_PREDICTOR,
     batch_size=BATCH_SIZE,
-    verbose=1 # Show progress
+    verbose=1 # Shows progress
 )
 
 # --- Evaluation ---
