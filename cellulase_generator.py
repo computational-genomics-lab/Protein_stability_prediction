@@ -176,25 +176,24 @@ n_meta_features = metadata.shape[1]
 print("Calculating median metadata for stable proteins...")
 
 # Define the stability threshold
-STABILITY_THRESHOLD = 40 # Or maybe even lower, like 20, for more confidence
+STABILITY_THRESHOLD = 40 
 
 # Define the columns for which you need median values (must match meta_features_cols later!)
-# Make sure these columns exist in 'df' after cleaning!
+
 cols_for_median = [
     'mol_wt', 'aromaticity', 'pi', 'chrg', 'gravy',
     'molar_extinct1', 'molar_extinct2',
     'alpha', 'beta', 'random_coil',
     'flexibility_mean'
 ]
-target_col_name = 'instability index' # Make sure this matches your column name
+target_col_name = 'instability index' 
 
 # Filter the DataFrame for stable proteins
 stable_df = df[df[target_col_name] < STABILITY_THRESHOLD].copy()
 
 if stable_df.empty:
     print(f"Warning: No proteins found with instability < {STABILITY_THRESHOLD}. Check data or threshold.")
-    # Handle this case: maybe use the overall median, or a specific example known to be stable
-    # For now, let's calculate overall median as a fallback
+
     median_stable_meta = df[cols_for_median].median()
     print("Using OVERALL median metadata as fallback.")
 else:
