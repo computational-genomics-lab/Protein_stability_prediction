@@ -116,12 +116,12 @@ Using these exact versions is strongly recommended to avoid binary incompatibili
 
 Create a clean conda environment:
 
-(conda create -n cellulase_env python=3.9)
-(conda activate cellulase_env)
+```conda create -n cellulase_env python=3.9```
+```conda activate cellulase_env```
 
 Install dependencies:
 
-(pip install numpy==1.23.5 pandas==1.5.3 scikit-learn==1.1.3 tensorflow==2.10.1 h5py==3.8.0 protobuf==3.19.6)
+```pip install numpy==1.23.5 pandas==1.5.3 scikit-learn==1.1.3 tensorflow==2.10.1 h5py==3.8.0 protobuf==3.19.6```
 
 ---
 
@@ -129,13 +129,13 @@ Install dependencies:
 
 ### 1. (Optional) Compute Median Stable Metadata
 
-(python statistics.py)
+```python statistics.py```
 
 This calculates median values for proteins with Instability Index < 40.
 
 ### 2. Run Full Pipeline
 
-(python cellulase_generator.py)
+```python cellulase_generator.py```
 
 The script will:
 
@@ -207,16 +207,6 @@ Generated sequences should be validated using:
 - Save trained models for reuse  
 
 ---
-
-```python
-# Example usage
-
-# (Optional) Compute median metadata for stable proteins
-python statistics.py
-
-# Run full training and generation pipeline
-python cellulase_generator.py
-```
 
 
 ## License
