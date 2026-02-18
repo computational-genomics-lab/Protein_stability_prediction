@@ -1,40 +1,40 @@
-# 🧬 Stable Cellulase Sequence Generation using Machine Learning
+# Stable Cellulase Sequence Generation using Machine Learning
 
 Deep generative modeling of cellulase enzymes using a Stability Predictor and a Conditional Variational Autoencoder (CVAE).
 
-This project designs **novel cellulase sequences predicted to be stable** (Instability Index < 40) using supervised and generative deep learning.
+This project designs novel cellulase sequences predicted to be stable (Instability Index < 40) using supervised and generative deep learning.
 
 ---
 
-## 🚀 What This Project Does
+## Project Overview
 
 This pipeline performs:
 
-1. 🔬 Data preprocessing and metadata extraction  
-2. 🧠 Training a Stability Predictor (regression model)  
-3. 🧬 Training a Conditional Variational Autoencoder (CVAE)  
-4. 🎯 Conditional sequence generation  
-5. 🛡 Filtering generated sequences by predicted stability  
+1. Data preprocessing and metadata extraction  
+2. Training a Stability Predictor (regression model)  
+3. Training a Conditional Variational Autoencoder (CVAE)  
+4. Conditional sequence generation  
+5. Filtering generated sequences by predicted stability  
 
-The instability index (threshold < 40) is used as a proxy for protein stability.
+The instability index (threshold < 40) is used as a computational proxy for protein stability.
 
 ---
 
-## 🏗 Model Architecture Overview
+## Model Architecture
 
-### 🔹 Stability Predictor
+### Stability Predictor
 
 Multi-input neural network:
 
 Sequence branch:
-- Conv1D → MaxPooling
-- Conv1D → GlobalMaxPooling
+- Conv1D → MaxPooling  
+- Conv1D → GlobalMaxPooling  
 
 Metadata branch:
 - Dense layer (ReLU)
 
 Combined:
-- Dense layer
+- Dense layer  
 - Linear output (Instability Index regression)
 
 Loss: Mean Squared Error (MSE)  
@@ -42,20 +42,20 @@ Metric: Mean Absolute Error (MAE)
 
 ---
 
-### 🔹 Conditional Variational Autoencoder (CVAE)
+### Conditional Variational Autoencoder (CVAE)
 
 Encoder:
-- Conv1D blocks
-- Flatten
-- Concatenate with metadata
-- Dense layer
-- Latent mean + log variance
-- Reparameterization trick
+- Conv1D blocks  
+- Flatten  
+- Concatenate with metadata  
+- Dense layer  
+- Latent mean + log variance  
+- Reparameterization trick  
 
 Decoder:
-- Dense → reshape
-- Conv1DTranspose layers
-- Final Conv1D with softmax activation
+- Dense → reshape  
+- Conv1DTranspose layers  
+- Final Conv1D with softmax activation  
 
 Loss Function:
 
@@ -63,139 +63,157 @@ Reconstruction Loss + β × KL Divergence
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
-- `cellulase_generator.py` → Main training + generation pipeline  
-- `statistics.py` → Stable median metadata calculation  
-- `methodology_22.4.15.docx` → Detailed methodology and results  
+- `cellulase_generator.py` — Main training and generation pipeline  
+- `statistics.py` — Stable median metadata calculation  
+- `methodology_22.4.15.docx` — Detailed methodology and results  
 
 ---
 
-## 📊 Input Dataset Requirements
+## Dataset Requirements
 
-Place your dataset CSV in the repository root.
+Place your dataset CSV file in the repository root.
 
 ### Required Columns
 
-- `seq` — amino acid sequence (string)
-- `mol_wt` — molecular weight
-- `aromaticity`
-- `pi`
-- `chrg`
-- `gravy`
-- `molar extinction coefficient` — two numeric values (list or parseable string)
-- `ss` — secondary structure fractions [alpha, beta, random_coil]
-- `flexibility` — list or mean-convertible values
-- `instability index` — target stability metric
+- `seq` — amino acid sequence (string)  
+- `mol_wt` — molecular weight  
+- `aromaticity`  
+- `pi`  
+- `chrg`  
+- `gravy`  
+- `molar extinction coefficient` — two numeric values (list or parseable string)  
+- `ss` — secondary structure fractions `[alpha, beta, random_coil]`  
+- `flexibility` — list or mean-convertible values  
+- `instability index` — target stability metric  
 
 ### Notes
 
-- List/tuple columns must be parseable using `ast.literal_eval`
-- Sequences are padded/truncated to `MAX_LEN = 500`
-- Metadata is standardized using `StandardScaler`
+- List/tuple columns must be parseable using `ast.literal_eval`  
+- Sequences are padded/truncated to `MAX_LEN = 500`  
+- Metadata is standardized using `StandardScaler`  
 
 ---
 
-## ⚙ Installation
+## Environment (Tested Configuration)
 
-Requirements:
+This project was tested with:
 
-- Python 3.8+
-- TensorFlow 2.x
-- NumPy
-- Pandas
-- Scikit-learn
+- Python 3.9  
+- TensorFlow 2.10.1  
+- NumPy 1.23.5  
+- Pandas 1.5.3  
+- Scikit-learn 1.1.3  
+- h5py 3.8.0  
+- protobuf 3.19.6  
+
+Using these exact versions is strongly recommended to avoid binary incompatibility issues.
+
+---
+
+## Installation
+
+Create a clean conda environment:
+
+
+conda create -n cellulase_env python=3.9
+conda activate cellulase_env
+
 
 Install dependencies:
 
-pip install numpy pandas scikit-learn tensorflow
+pip install numpy==1.23.5 pandas==1.5.3 scikit-learn==1.1.3 tensorflow==2.10.1 h5py==3.8.0 protobuf==3.19.6
+
 
 ---
 
-## ▶ How To Run
+## How to Run
 
-### 1️⃣ (Optional) Compute Median Stable Metadata
+### 1. (Optional) Compute Median Stable Metadata
 
 python statistics.py
 
+
 This calculates median values for proteins with Instability Index < 40.
 
----
-
-### 2️⃣ Run Full Pipeline
+### 2. Run Full Pipeline
 
 python cellulase_generator.py
 
+
 The script will:
 
-- Clean and preprocess data
-- Train Stability Predictor
-- Train CVAE
-- Generate new sequences
-- Filter stable candidates
-- Save results to `bacterial_sequences.txt`
+- Clean and preprocess data  
+- Train the Stability Predictor  
+- Train the CVAE  
+- Generate new sequences  
+- Filter stable candidates  
+- Save results to `fungal_sequences.txt` (or the defined output file)  
 
 ---
 
-## 🎯 Configure Target Generation Properties
+## Configure Target Generation Properties
 
 In `cellulase_generator.py`, locate:
 
 target_metadata_example = [...]
 
+
 The order must match:
 
 ['mol_wt', 'aromaticity', 'pi', 'chrg', 'gravy',
- 'molar_extinct1', 'molar_extinct2',
- 'alpha', 'beta', 'random_coil',
- 'flexibility_mean']
+'molar_extinct1', 'molar_extinct2',
+'alpha', 'beta', 'random_coil',
+'flexibility_mean']
 
-Tip: Use median values from stable proteins for realistic conditioning.
 
----
-
-## 📈 Output
-
-- Training logs in console
-- Predicted instability scores
-- Stable sequences saved to text file
-- Top candidates printed in terminal
+Using median values from stable proteins is recommended for realistic conditioning.
 
 ---
 
-## 🧪 Scientific Considerations
+## Output
 
-⚠ Instability index is an in silico proxy.
+- Training logs in console  
+- Predicted instability scores  
+- Stable sequences saved to text file  
+- Top candidates printed in terminal  
+
+---
+
+## Scientific Considerations
+
+The instability index is an in silico proxy and does not guarantee experimental stability.
 
 Generated sequences should be validated using:
 
-- BLAST homology search
-- AlphaFold structure prediction
-- Active-site conservation analysis
-- Experimental expression and stability assays
+- BLAST homology search  
+- AlphaFold structure prediction  
+- Active-site conservation analysis  
+- Experimental expression and stability assays  
 
 ---
 
-## 🔧 Limitations
+## Limitations
 
-- No explicit activity prediction
-- No structural constraints in model
-- Argmax decoding reduces diversity
-- Stability predictor accuracy depends on dataset quality
-
----
-
-## 🚀 Future Improvements
-
-- Add enzyme activity predictor
-- Integrate structure-aware embeddings
-- Use probabilistic decoding instead of argmax
-- Add diversity metrics
-- Save trained models explicitly
+- No explicit activity prediction  
+- No structural constraints in the generative model  
+- Argmax decoding reduces sequence diversity  
+- Stability predictor performance depends on dataset quality  
 
 ---
 
-## 📜 License
+## Future Improvements
+
+- Add enzyme activity predictor  
+- Integrate structure-aware embeddings  
+- Use probabilistic decoding instead of argmax  
+- Add sequence diversity metrics  
+- Save trained models for reuse  
+
+---
+
+## License
 
 MIT License
 
