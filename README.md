@@ -1,28 +1,107 @@
-# Stable Cellulase Sequence Generation using Machine Learning
+# 🧬 Stable Cellulase Sequence Generation using Machine Learning
 
-Deep generative design of bacterial/fungal cellulase sequences conditioned on physicochemical metadata.
+Deep generative modeling of cellulase enzymes using a Stability Predictor and a Conditional Variational Autoencoder (CVAE).
 
-This project builds a Stability Predictor and a Conditional Variational Autoencoder (CVAE) to generate novel cellulase sequences predicted to be stable (Instability Index < 40).
-
----
-
-## Overview
-
-This repository implements an end-to-end pipeline to:
-
-1. Clean and preprocess cellulase sequence datasets and associated physicochemical metadata.
-2. Train a Stability Predictor (sequence + metadata → instability index).
-3. Train a Conditional Variational Autoencoder (CVAE) to generate amino-acid sequences conditioned on metadata.
-4. Generate candidate sequences and filter them using the Stability Predictor.
-
-The instability index (Instability Index < 40) is used as the stability threshold.
+This project designs **novel cellulase sequences predicted to be stable** (Instability Index < 40) using supervised and generative deep learning.
 
 ---
 
-## Requirements
+## 🚀 What This Project Does
+
+This pipeline performs:
+
+1. 🔬 Data preprocessing and metadata extraction  
+2. 🧠 Training a Stability Predictor (regression model)  
+3. 🧬 Training a Conditional Variational Autoencoder (CVAE)  
+4. 🎯 Conditional sequence generation  
+5. 🛡 Filtering generated sequences by predicted stability  
+
+The instability index (threshold < 40) is used as a proxy for protein stability.
+
+---
+
+## 🏗 Model Architecture Overview
+
+### 🔹 Stability Predictor
+
+Multi-input neural network:
+
+Sequence branch:
+- Conv1D → MaxPooling
+- Conv1D → GlobalMaxPooling
+
+Metadata branch:
+- Dense layer (ReLU)
+
+Combined:
+- Dense layer
+- Linear output (Instability Index regression)
+
+Loss: Mean Squared Error (MSE)  
+Metric: Mean Absolute Error (MAE)
+
+---
+
+### 🔹 Conditional Variational Autoencoder (CVAE)
+
+Encoder:
+- Conv1D blocks
+- Flatten
+- Concatenate with metadata
+- Dense layer
+- Latent mean + log variance
+- Reparameterization trick
+
+Decoder:
+- Dense → reshape
+- Conv1DTranspose layers
+- Final Conv1D with softmax activation
+
+Loss Function:
+
+Reconstruction Loss + β × KL Divergence
+
+---
+
+## 📂 Repository Structure
+
+- `cellulase_generator.py` → Main training + generation pipeline  
+- `statistics.py` → Stable median metadata calculation  
+- `methodology_22.4.15.docx` → Detailed methodology and results  
+
+---
+
+## 📊 Input Dataset Requirements
+
+Place your dataset CSV in the repository root.
+
+### Required Columns
+
+- `seq` — amino acid sequence (string)
+- `mol_wt` — molecular weight
+- `aromaticity`
+- `pi`
+- `chrg`
+- `gravy`
+- `molar extinction coefficient` — two numeric values (list or parseable string)
+- `ss` — secondary structure fractions [alpha, beta, random_coil]
+- `flexibility` — list or mean-convertible values
+- `instability index` — target stability metric
+
+### Notes
+
+- List/tuple columns must be parseable using `ast.literal_eval`
+- Sequences are padded/truncated to `MAX_LEN = 500`
+- Metadata is standardized using `StandardScaler`
+
+---
+
+## ⚙ Installation
+
+Requirements:
 
 - Python 3.8+
-- TensorFlow (2.x)
+- TensorFlow 2.x
 - NumPy
 - Pandas
 - Scikit-learn
@@ -33,143 +112,104 @@ pip install numpy pandas scikit-learn tensorflow
 
 ---
 
-## Input Data Format
+## ▶ How To Run
 
-The script expects a CSV file in the project directory (update filename in the script if needed).
-
-### Required Columns
-
-- seq — amino acid sequence (string)
-- mol_wt — molecular weight
-- aromaticity — aromaticity fraction
-- pi — isoelectric point
-- chrg — net charge
-- gravy — grand average of hydropathicity
-- molar extinction coefficient — two numeric values (list or parseable string)
-- ss — secondary structure fractions [alpha, beta, random_coil]
-- flexibility — list of values or mean-convertible values
-- instability index — target stability metric
-
-Notes:
-- List/tuple columns must be parseable using ast.literal_eval.
-- Sequences are padded/truncated to MAX_LEN = 500.
-
----
-
-## How to Run
-
-1. Place your CSV file in the repository directory.
-2. (Optional) Run statistics helper to compute stable medians:
+### 1️⃣ (Optional) Compute Median Stable Metadata
 
 python statistics.py
 
-3. Run the full pipeline:
+This calculates median values for proteins with Instability Index < 40.
+
+---
+
+### 2️⃣ Run Full Pipeline
 
 python cellulase_generator.py
 
 The script will:
-- Preprocess data
-- Train the Stability Predictor
-- Train the CVAE
-- Generate sequences
-- Filter sequences based on predicted instability
-- Save stable candidates to a text file
+
+- Clean and preprocess data
+- Train Stability Predictor
+- Train CVAE
+- Generate new sequences
+- Filter stable candidates
+- Save results to `bacterial_sequences.txt`
 
 ---
 
-## Configuration
+## 🎯 Configure Target Generation Properties
 
-Open cellulase_generator.py and adjust:
+In `cellulase_generator.py`, locate:
 
-- MAX_LEN
-- LATENT_DIM
-- EPOCHS_PREDICTOR
-- EPOCHS_CVAE
-- BATCH_SIZE
-- KL_WEIGHT
-- STABILITY_THRESHOLD
-- num_sequences_to_generate
+target_metadata_example = [...]
 
-### Target Metadata Order
-
-The metadata order must match:
+The order must match:
 
 ['mol_wt', 'aromaticity', 'pi', 'chrg', 'gravy',
  'molar_extinct1', 'molar_extinct2',
  'alpha', 'beta', 'random_coil',
  'flexibility_mean']
 
-Choose realistic target values (e.g., median of stable proteins).
+Tip: Use median values from stable proteins for realistic conditioning.
 
 ---
 
-## Model Architecture
+## 📈 Output
 
-### Stability Predictor
-
-- Conv1D → MaxPooling
-- Conv1D → GlobalMaxPooling
-- Dense (metadata branch)
-- Concatenation
-- Dense
-- Linear output (regression)
-
-Loss: Mean Squared Error (MSE)
-Metric: Mean Absolute Error (MAE)
+- Training logs in console
+- Predicted instability scores
+- Stable sequences saved to text file
+- Top candidates printed in terminal
 
 ---
 
-### Conditional Variational Autoencoder (CVAE)
+## 🧪 Scientific Considerations
 
-Encoder:
-- Conv1D blocks
-- Flatten
-- Concatenate with metadata
-- Dense
-- Latent mean and log variance
-- Reparameterization trick
+⚠ Instability index is an in silico proxy.
 
-Decoder:
-- Dense → reshape
-- Conv1DTranspose layers
-- Final Conv1D with softmax activation
+Generated sequences should be validated using:
 
-Loss:
-Reconstruction Loss + β * KL Divergence
+- BLAST homology search
+- AlphaFold structure prediction
+- Active-site conservation analysis
+- Experimental expression and stability assays
 
 ---
 
-## Output
+## 🔧 Limitations
 
-- Console logs showing training progress
-- Predicted instability scores for generated sequences
-- bacterial_sequences.txt containing filtered stable sequences
-
----
-
-## Limitations
-
-- Instability index is an in silico proxy for stability.
-- Generated sequences require:
-  - BLAST homology validation
-  - Structural modeling (e.g., AlphaFold)
-  - Experimental testing
-
-Argmax decoding reduces diversity; probabilistic sampling may improve exploration.
+- No explicit activity prediction
+- No structural constraints in model
+- Argmax decoding reduces diversity
+- Stability predictor accuracy depends on dataset quality
 
 ---
 
-## Suggested Improvements
+## 🚀 Future Improvements
 
-- Add activity prediction model
-- Use attention-based encoders
-- Incorporate structural embeddings
+- Add enzyme activity predictor
+- Integrate structure-aware embeddings
+- Use probabilistic decoding instead of argmax
 - Add diversity metrics
-- Save trained models explicitly using model.save()
+- Save trained models explicitly
 
 ---
 
-## License
+## 📜 License
 
-Add an MIT License (recommended) or appropriate license file.
+MIT License
 
+Copyright (c) 2024
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
