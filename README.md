@@ -208,6 +208,17 @@ Generated sequences should be validated using:
 
 ---
 
+```python
+# Example usage
+
+# (Optional) Compute median metadata for stable proteins
+python statistics.py
+
+# Run full training and generation pipeline
+python cellulase_generator.py
+```
+
+
 ## License
 
 MIT License
