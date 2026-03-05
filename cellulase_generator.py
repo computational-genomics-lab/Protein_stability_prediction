@@ -7,6 +7,9 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, utils, callbacks, losses
 from tensorflow.keras.optimizers import Adam
 import tensorflow.keras.backend as K
+import joblib
+
+
 
 ### Configuration ###
 MAX_LEN = 500       # Maximum sequence length for padding/truncating
@@ -112,7 +115,7 @@ def sampling(args):
 ### Data Loading and Preprocessing ###
 
 print("1. Loading data...")
-df = pd.read_csv('Fungal_analysis.csv')
+df = pd.read_csv('Fungal_sequences.csv')
 print(f"Initial rows: {len(df)}")
 
 # --- Initial Sequence Cleaning ---
@@ -400,6 +403,14 @@ history_cvae = cvae.fit(
     verbose=1
 )
 
+## Saving the Models
+predictor.save("predictor_7k.h5")
+cvae.save("cvae_7k.h5")
+encoder.save("encoder_7k.h5")
+decoder.save("decoder_7k.h5")
+joblib.dump(scaler, "meta_scaler_7k.pkl")
+
+
 ### Sequence Generation ###
 print("\n10. Generating Sequences...")
 
@@ -509,6 +520,6 @@ for i, seq in enumerate(stable_sequences[:5]): # Display top 5
     print(top_stable_sequences)
 
 
-with open('fungal_sequences.txt', 'w') as file:
+with open('fungal_synthetic_sequences.txt', 'w') as file:
     for sequence in top_stable_sequences:
         file.write(f"{sequence}\n")
