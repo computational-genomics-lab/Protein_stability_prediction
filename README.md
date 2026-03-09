@@ -1,237 +1,366 @@
-# Stable Cellulase Sequence Generation using Machine Learning
+# Stable Cellulase Generator
 
-Deep generative modeling of cellulase enzymes using a Stability Predictor and a Conditional Variational Autoencoder (CVAE).
+**Repository purpose:** reproducible pipeline to generate candidate cellulase sequences using a Conditional VAE (CVAE) combined with a Stability Predictor (CNN).
 
-This project designs novel cellulase sequences predicted to be stable (Instability Index < 40) using supervised and generative deep learning.
-
----
-
-## Project Overview
-
-This pipeline performs:
-
-1. Data preprocessing and metadata extraction  
-2. Training a Stability Predictor (regression model)  
-3. Training a Conditional Variational Autoencoder (CVAE)  
-4. Conditional sequence generation  
-5. Filtering generated sequences by predicted stability  
-
-The instability index (threshold < 40) is used as a computational proxy for protein stability.
+Phase-2 implements guided generation: experimentally validated peptides are used as anchors in latent space, nearby latent points are sampled, decoded to sequences, filtered by predicted stability, diversified, and the top candidates are selected for synthesis.
 
 ---
 
-## Model Architecture
+# Repository Structure
 
-### Stability Predictor
+```
+.
+├── cellulase_generator.py
+├── phase_2.py
+├── statistics.py
+├── models/
+├── experimental_peptides.csv
+└── results/
+```
 
-Multi-input neural network:
+**File descriptions**
 
-Sequence branch:
-- Conv1D → MaxPooling  
-- Conv1D → GlobalMaxPooling  
+- `cellulase_generator.py`  
+  Trains the CVAE generative model and stability predictor.
 
-Metadata branch:
-- Dense layer (ReLU)
+- `phase_2.py`  
+  Performs guided sequence generation using experimentally validated anchor peptides.
 
-Combined:
-- Dense layer  
-- Linear output (Instability Index regression)
+- `statistics.py`  
+  Utility script for computing summary statistics such as medians.
 
-Loss: Mean Squared Error (MSE)  
-Metric: Mean Absolute Error (MAE)
+- `models/`  
+  Directory containing trained model files and metadata scaler.
 
----
+- `experimental_peptides.csv`  
+  Input dataset containing experimentally validated peptides.
 
-### Conditional Variational Autoencoder (CVAE)
-
-Encoder:
-- Conv1D blocks  
-- Flatten  
-- Concatenate with metadata  
-- Dense layer  
-- Latent mean + log variance  
-- Reparameterization trick  
-
-Decoder:
-- Dense → reshape  
-- Conv1DTranspose layers  
-- Final Conv1D with softmax activation  
-
-Loss Function:
-
-Reconstruction Loss + β × KL Divergence
+- `results/`  
+  Output directory where generated sequences and scoring tables are written.
 
 ---
 
-## Repository Structure
+# Required Model Artifacts
 
-- `cellulase_generator.py` — Main training and generation pipeline  
-- `statistics.py` — Stable median metadata calculation  
-- `methodology_22.4.15.docx` — Detailed methodology and results  
+After training the CVAE and predictor using the curated cellulase dataset, the following files must be available:
 
----
+```
+encoder_7k.h5
+decoder_7k.h5
+predictor_7k.h5
+cvae_7k.h5
+meta_scaler_7k.pkl
+```
 
-## Dataset Requirements
+These files should be placed inside the `models/` directory.
 
-Place your dataset CSV file in the repository root.
+### Important
 
-### Required Columns
+`meta_scaler_7k.pkl` is critical because it contains the fitted metadata scaler used during training.  
+The metadata columns and their order must exactly match those used during training.
 
-- `seq` — amino acid sequence (string)  
-- `mol_wt` — molecular weight  
-- `aromaticity`  
-- `pi`  
-- `chrg`  
-- `gravy`  
-- `molar extinction coefficient` — two numeric values (list or parseable string)  
-- `ss` — secondary structure fractions `[alpha, beta, random_coil]`  
-- `flexibility` — list or mean-convertible values  
-- `instability index` — target stability metric  
-
-### Notes
-
-- List/tuple columns must be parseable using `ast.literal_eval`  
-- Sequences are padded/truncated to `MAX_LEN = 500`  
-- Metadata is standardized using `StandardScaler`  
+If this file is lost, latent encoding of experimental peptides will become inconsistent and the generation procedure will not function correctly.
 
 ---
 
-## Environment (Tested Configuration)
+# Quick Start
 
-This project was tested with:
+## Step 1 — Train the Model
 
-- Python 3.9  
-- TensorFlow 2.10.1  
-- NumPy 1.23.5  
-- Pandas 1.5.3  
-- Scikit-learn 1.1.3  
-- h5py 3.8.0  
-- protobuf 3.19.6  
-
-Using these exact versions is strongly recommended to avoid binary incompatibility issues.
-
----
-
-## Installation
-
-Create a clean conda environment:
+Run the training pipeline on the curated cellulase dataset.
 
 ```bash
-conda create -n cellulase_env python=3.9
+python cellulase_generator.py \
+--data Fungal_7k_curated.csv \
+--save_dir models/
+```
+
+This script should produce:
+
+- encoder model
+- decoder model
+- predictor model
+- metadata scaler (`meta_scaler_7k.pkl`)
+
+---
+
+## Step 2 — Prepare Experimental Peptides
+
+Create a CSV file:
+
+```
+experimental_peptides.csv
+```
+
+Required columns include:
+
+```
+id
+seq
+mol_wt
+aromaticity
+pi
+charge
+gravy
+instability_index
+```
+
+The metadata columns must be identical to the columns used during training.
+
+Column order must match the scaler.
+
+---
+
+## Step 3 — Run Guided Generation
+
+Execute the Phase-2 pipeline:
+
+```bash
+python phase_2.py \
+--encoder models/encoder_7k.h5 \
+--decoder models/decoder_7k.h5 \
+--predictor models/predictor_7k.h5 \
+--scaler models/meta_scaler_7k.pkl \
+--experimental_csv experimental_peptides.csv \
+--output_dir results/ \
+--n_per_anchor 1500 \
+--sigma auto \
+--stability_threshold 40 \
+--final_k 10
+```
+
+---
+
+# Output Files
+
+The pipeline generates the following outputs:
+
+### Top candidates
+
+```
+results/top_guided_candidates.csv
+```
+
+Contains the highest scoring sequences selected for experimental synthesis.
+
+### FASTA output
+
+```
+results/top_guided_candidates.fasta
+```
+
+FASTA formatted sequences for peptide ordering.
+
+### Full audit table
+
+```
+results/all_stable_candidates_scored.csv
+```
+
+Contains all filtered candidates with predicted stability scores and latent distances.
+
+---
+
+# Phase-2 Pipeline Overview
+
+The guided generation process performs the following steps:
+
+1. Load trained encoder, decoder, predictor, and metadata scaler.
+2. Import preprocessing functions used during training.
+3. Read experimental peptides.
+4. Encode peptides to obtain latent anchor vectors.
+5. Estimate sampling radius (`sigma`).
+6. Sample latent points near anchor vectors.
+7. Decode latent vectors to amino acid sequences.
+8. Remove duplicate sequences.
+9. Predict stability using the CNN predictor.
+10. Filter sequences by instability threshold.
+11. Compute latent distances from anchors.
+12. Score candidates using stability and proximity.
+13. Cluster sequences in latent space to enforce diversity.
+14. Select the final candidate sequences.
+
+---
+
+# Sampling Radius Selection
+
+Sampling radius controls how far the algorithm explores from the anchor peptides.
+
+Typical values:
+
+| Anchor spacing | Recommended sigma |
+|----------------|------------------|
+| very close | 0.10 – 0.20 |
+| moderate | 0.20 – 0.30 |
+| far apart | 0.30 – 0.40 |
+
+Automatic estimation:
+
+```
+sigma = median_pairwise_anchor_distance * 0.2
+```
+
+Manual inspection is recommended before running large generation batches.
+
+---
+
+# Stability Filtering
+
+Generated sequences are filtered using the predicted instability index.
+
+Default filter:
+
+```
+instability_index < 40
+```
+
+Stricter filter:
+
+```
+instability_index < 30
+```
+
+Lower instability values indicate higher predicted stability.
+
+---
+
+# Diversity Enforcement
+
+To avoid near-identical sequences, candidates are clustered in latent space.
+
+Example method:
+
+```
+MiniBatchKMeans
+```
+
+The top scoring candidate from each cluster is selected to ensure sequence diversity.
+
+---
+
+# Recommended Hyperparameters
+
+```
+n_per_anchor = 1500
+sigma = 0.15 – 0.25
+stability_threshold = 40
+final_k = 10
+```
+
+Composite scoring weights:
+
+```
+w_instability = 0.7
+w_proximity = 0.3
+```
+
+Suggested cluster count:
+
+```
+clusters ≈ min(12, number_of_candidates / 10)
+```
+
+---
+
+# Manual Quality Checks Before Synthesis
+
+Inspect candidate sequences for:
+
+- valid amino acid alphabet
+- appropriate sequence length
+- absence of long repetitive motifs
+- acceptable predicted instability values
+- sufficient diversity between candidates
+
+Optional checks:
+
+- BLAST similarity search
+- signal peptide prediction
+- transmembrane domain prediction
+
+---
+
+# Troubleshooting
+
+## Decoder produces invalid amino acids
+
+Ensure the amino acid mapping used in `decode_onehot_to_sequence()` matches the mapping used during training.
+
+---
+
+## Metadata scaler errors
+
+Verify that:
+
+- `meta_scaler_7k.pkl` was generated during training.
+- metadata columns appear in the same order as training data.
+
+---
+
+## Too few candidates pass the stability filter
+
+Possible solutions:
+
+- increase `n_per_anchor`
+- increase `sigma`
+- relax the stability threshold slightly
+
+---
+
+## Too many similar sequences
+
+Increase the number of clusters used for diversity filtering.
+
+---
+
+# Conda Environment Example
+
+```
+conda create -n cellulase_env python=3.9 -y
 conda activate cellulase_env
+
+pip install numpy
+pip install pandas
+pip install scikit-learn
+pip install tensorflow==2.11.0
+pip install joblib
+pip install scipy
 ```
 
-Install dependencies:
+Adjust the TensorFlow version if necessary to match the version used when saving the trained models.
 
-```bash
-pip install numpy==1.23.5 pandas==1.5.3 scikit-learn==1.1.3 tensorflow==2.10.1 h5py==3.8.0 protobuf==3.19.6
+---
+
+# Reproducibility
+
+For reproducibility, retain the following files:
+
+```
+top_guided_candidates.csv
+top_guided_candidates.fasta
+all_stable_candidates_scored.csv
+encoder_7k.h5
+decoder_7k.h5
+predictor_7k.h5
+meta_scaler_7k.pkl
 ```
 
 ---
 
-## How to Run
+# Scientific Limitations
 
-### 1. (Optional) Compute Median Stable Metadata
+The current pipeline optimizes sequence stability rather than catalytic activity.
 
-```bash
-python statistics.py
-```
+Future improvements may include:
 
-This calculates median values for proteins with Instability Index < 40.
-
-### 2. Run Full Pipeline
-
-```bash
-python cellulase_generator.py
-```
-
-The script will:
-
-- Clean and preprocess data  
-- Train the Stability Predictor  
-- Train the CVAE  
-- Generate new sequences  
-- Filter stable candidates  
-- Save results to `fungal_sequences.txt` (or the defined output file)  
+- training an activity predictor using experimentally measured activity data
+- retraining the predictor with new labeled results from synthesis experiments
+- comparing guided generation with random latent sampling strategies
 
 ---
 
-## Configure Target Generation Properties
+# License
 
-In `cellulase_generator.py`, locate:
+MIT License © 2024
 
-target_metadata_example = [...]
-
-
-The order must match:
-
-['mol_wt', 'aromaticity', 'pi', 'chrg', 'gravy',
-'molar_extinct1', 'molar_extinct2',
-'alpha', 'beta', 'random_coil',
-'flexibility_mean']
-
-
-Using median values from stable proteins is recommended for realistic conditioning.
-
----
-
-## Output
-
-- Training logs in console  
-- Predicted instability scores  
-- Stable sequences saved to text file  
-- Top candidates printed in terminal  
-
----
-
-## Scientific Considerations
-
-The instability index is an in silico proxy and does not guarantee experimental stability.
-
-Generated sequences should be validated using:
-
-- BLAST homology search  
-- AlphaFold structure prediction  
-- Active-site conservation analysis  
-- Experimental expression and stability assays  
-
----
-
-## Limitations
-
-- No explicit activity prediction  
-- No structural constraints in the generative model  
-- Argmax decoding reduces sequence diversity  
-- Stability predictor performance depends on dataset quality  
-
----
-
-## Future Improvements
-
-- Add enzyme activity predictor  
-- Integrate structure-aware embeddings  
-- Use probabilistic decoding instead of argmax  
-- Add sequence diversity metrics  
-- Save trained models for reuse  
-
----
-
-
-## License
-
-MIT License
-
-Copyright (c) 2024
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files to deal in the Software without restriction.
