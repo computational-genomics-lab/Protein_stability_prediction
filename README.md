@@ -1,366 +1,341 @@
 # Stable Cellulase Generator
 
-**Repository purpose:** reproducible pipeline to generate candidate cellulase sequences using a Conditional VAE (CVAE) combined with a Stability Predictor (CNN).
+A machine-learning pipeline for generating **novel cellulase sequences** using a Conditional Variational Autoencoder (CVAE) combined with a stability prediction network.
 
-Phase-2 implements guided generation: experimentally validated peptides are used as anchors in latent space, nearby latent points are sampled, decoded to sequences, filtered by predicted stability, diversified, and the top candidates are selected for synthesis.
+The system performs **guided protein sequence generation** by anchoring experimentally validated cellulases in latent space and sampling nearby regions to discover promising variants.
+
+This approach allows efficient exploration of protein sequence space while prioritizing stability and similarity to experimentally validated peptides.
 
 ---
 
 # Repository Structure
 
-```
+
 .
-├── cellulase_generator.py
-├── phase_2.py
-├── statistics.py
-├── models/
-├── experimental_peptides.csv
-└── results/
-```
+├── cellulase_generator.py # Phase 1: Train models and generate initial sequences
+├── phase_2.py # Phase 2: Guided sequence generation using experimental anchors
+├── statistics.py # Compute median metadata values for conditioning
+├── models/ # Saved trained models
+│ ├── encoder_7k.h5
+│ ├── decoder_7k.h5
+│ ├── predictor_7k.h5
+│ └── meta_scaler_7k.pkl
+├── experimental_peptides.csv # Experimentally validated cellulases
+└── results/ # Generated candidate sequences
 
-**File descriptions**
-
-- `cellulase_generator.py`  
-  Trains the CVAE generative model and stability predictor.
-
-- `phase_2.py`  
-  Performs guided sequence generation using experimentally validated anchor peptides.
-
-- `statistics.py`  
-  Utility script for computing summary statistics such as medians.
-
-- `models/`  
-  Directory containing trained model files and metadata scaler.
-
-- `experimental_peptides.csv`  
-  Input dataset containing experimentally validated peptides.
-
-- `results/`  
-  Output directory where generated sequences and scoring tables are written.
 
 ---
 
-# Required Model Artifacts
+# Pipeline Overview
 
-After training the CVAE and predictor using the curated cellulase dataset, the following files must be available:
+The workflow is divided into **two phases**.
 
-```
+## Phase 1 — Model Training
+
+`cellulase_generator.py`
+
+This script:
+
+1. Loads curated cellulase sequence dataset.
+2. Extracts sequence features and metadata.
+3. Trains two models:
+
+### CVAE Generator
+Learns the **latent representation of cellulase sequence space**.
+
+Components:
+- Encoder → compresses sequences into latent vectors
+- Decoder → reconstructs sequences from latent vectors
+
+### CNN Stability Predictor
+Predicts **protein instability index** from sequence + metadata.
+
+Sequences predicted as unstable are filtered out.
+
+### Output Artifacts
+
+After training, the following models are saved:
+
+
 encoder_7k.h5
 decoder_7k.h5
 predictor_7k.h5
-cvae_7k.h5
 meta_scaler_7k.pkl
-```
 
-These files should be placed inside the `models/` directory.
 
-### Important
-
-`meta_scaler_7k.pkl` is critical because it contains the fitted metadata scaler used during training.  
-The metadata columns and their order must exactly match those used during training.
-
-If this file is lost, latent encoding of experimental peptides will become inconsistent and the generation procedure will not function correctly.
+The `meta_scaler_7k.pkl` contains the **StandardScaler used for metadata normalization** and must be reused during Phase 2.
 
 ---
 
-# Quick Start
+## Phase 2 — Guided Sequence Generation
 
-## Step 1 — Train the Model
+`phase_2.py`
 
-Run the training pipeline on the curated cellulase dataset.
+This phase uses **experimentally validated cellulases** as anchors to guide the generation process.
 
-```bash
-python cellulase_generator.py \
---data Fungal_7k_curated.csv \
---save_dir models/
-```
+### Key Idea
 
-This script should produce:
+Instead of sampling randomly from the latent space, the model:
 
-- encoder model
-- decoder model
-- predictor model
-- metadata scaler (`meta_scaler_7k.pkl`)
+1. Encodes experimentally validated peptides into latent vectors.
+2. Uses these vectors as **anchors ("gold nuggets")**.
+3. Samples new latent vectors near these anchors.
+4. Decodes them into candidate sequences.
+5. Filters sequences using the stability predictor.
+6. Selects the most promising candidates.
 
 ---
 
-## Step 2 — Prepare Experimental Peptides
+# Step-by-Step Workflow
 
-Create a CSV file:
+## 1 Load Models
 
-```
-experimental_peptides.csv
-```
 
-Required columns include:
+encoder_7k.h5
+decoder_7k.h5
+predictor_7k.h5
+meta_scaler_7k.pkl
 
-```
-id
-seq
-mol_wt
-aromaticity
-pi
-charge
-gravy
-instability_index
-```
 
-The metadata columns must be identical to the columns used during training.
-
-Column order must match the scaler.
+These models are trained using `cellulase_generator.py`.
 
 ---
 
-## Step 3 — Run Guided Generation
+## 2 Load Experimental Peptides
 
-Execute the Phase-2 pipeline:
+The file `experimental_peptides.csv` contains experimentally validated cellulases.
 
-```bash
-python phase_2.py \
---encoder models/encoder_7k.h5 \
---decoder models/decoder_7k.h5 \
---predictor models/predictor_7k.h5 \
---scaler models/meta_scaler_7k.pkl \
---experimental_csv experimental_peptides.csv \
---output_dir results/ \
---n_per_anchor 1500 \
---sigma auto \
---stability_threshold 40 \
---final_k 10
-```
+These peptides are encoded into latent vectors using the encoder.
 
 ---
 
-# Output Files
+## 3 Latent Anchoring
 
-The pipeline generates the following outputs:
+Each experimental peptide is mapped to a coordinate in latent space.
 
-### Top candidates
+Example:
 
-```
+
+anchor_vector = encoder(sequence)
+
+
+These vectors represent **regions of latent space associated with successful cellulases**.
+
+---
+
+## 4 Guided Sampling
+
+New latent vectors are generated by adding small Gaussian noise to anchor vectors.
+
+Example:
+
+
+z_new = anchor + noise
+
+
+This generates **variants similar to experimentally validated peptides**.
+
+---
+
+## 5 Decode Latent Vectors
+
+The decoder converts latent vectors back into protein sequences.
+
+
+sequence = decoder(z_new)
+
+
+This step produces **novel cellulase candidates**.
+
+---
+
+## 6 Stability Filtering
+
+All generated sequences are evaluated using the stability predictor.
+
+Sequences with instability index above the threshold are discarded.
+
+Default threshold:
+
+
+Instability Index < 40
+
+
+---
+
+## 7 Candidate Ranking
+
+Remaining sequences are ranked using:
+
+- Predicted instability score
+- Distance from anchor vectors
+- Sequence diversity
+
+---
+
+## 8 Diversity Clustering
+
+To avoid selecting near-identical sequences, candidates are clustered in latent space.
+
+The best sequence from each cluster is selected.
+
+---
+
+## 9 Final Candidate Selection
+
+The pipeline outputs the **top K sequences** (default = 10).
+
+These sequences are written to:
+
+
 results/top_guided_candidates.csv
-```
-
-Contains the highest scoring sequences selected for experimental synthesis.
-
-### FASTA output
-
-```
 results/top_guided_candidates.fasta
-```
 
-FASTA formatted sequences for peptide ordering.
 
-### Full audit table
-
-```
-results/all_stable_candidates_scored.csv
-```
-
-Contains all filtered candidates with predicted stability scores and latent distances.
+These are the sequences recommended for **experimental synthesis**.
 
 ---
 
-# Phase-2 Pipeline Overview
+# Utility Functions
 
-The guided generation process performs the following steps:
+Several helper functions are used in `phase_2.py`.
 
-1. Load trained encoder, decoder, predictor, and metadata scaler.
-2. Import preprocessing functions used during training.
-3. Read experimental peptides.
-4. Encode peptides to obtain latent anchor vectors.
-5. Estimate sampling radius (`sigma`).
-6. Sample latent points near anchor vectors.
-7. Decode latent vectors to amino acid sequences.
-8. Remove duplicate sequences.
-9. Predict stability using the CNN predictor.
-10. Filter sequences by instability threshold.
-11. Compute latent distances from anchors.
-12. Score candidates using stability and proximity.
-13. Cluster sequences in latent space to enforce diversity.
-14. Select the final candidate sequences.
+## Sequence Encoding
+
+
+def one_hot_encode_sequence(seq, aa_to_idx_map, max_len, vocab_size_local)
+
+
+Converts amino acid sequences into one-hot encoded matrices.
 
 ---
 
-# Sampling Radius Selection
+## Sequence Decoding
 
-Sampling radius controls how far the algorithm explores from the anchor peptides.
 
-Typical values:
+def decode_onehot_to_sequence(onehot_array, idx_to_aa_map)
 
-| Anchor spacing | Recommended sigma |
-|----------------|------------------|
-| very close | 0.10 – 0.20 |
-| moderate | 0.20 – 0.30 |
-| far apart | 0.30 – 0.40 |
 
-Automatic estimation:
-
-```
-sigma = median_pairwise_anchor_distance * 0.2
-```
-
-Manual inspection is recommended before running large generation batches.
+Converts decoder output back into amino acid sequences.
 
 ---
 
-# Stability Filtering
+## Encoder Output Handling
 
-Generated sequences are filtered using the predicted instability index.
 
-Default filter:
+def unpack_encoder_output(enc_out)
 
-```
-instability_index < 40
-```
 
-Stricter filter:
-
-```
-instability_index < 30
-```
-
-Lower instability values indicate higher predicted stability.
+Ensures compatibility with different encoder output formats.
 
 ---
 
-# Diversity Enforcement
+## Normalization Utility
 
-To avoid near-identical sequences, candidates are clustered in latent space.
 
-Example method:
+def normalize_array(a)
 
-```
-MiniBatchKMeans
-```
 
-The top scoring candidate from each cluster is selected to ensure sequence diversity.
+Normalizes arrays to a 0–1 range.
 
 ---
 
-# Recommended Hyperparameters
+## Guided Sampling Radius
 
-```
-n_per_anchor = 1500
-sigma = 0.15 – 0.25
-stability_threshold = 40
-final_k = 10
-```
 
-Composite scoring weights:
+def compute_sigma_for_anchor(anchor_vec)
 
-```
-w_instability = 0.7
-w_proximity = 0.3
-```
 
-Suggested cluster count:
-
-```
-clusters ≈ min(12, number_of_candidates / 10)
-```
+Determines the sampling radius used to generate nearby latent vectors.
 
 ---
 
-# Manual Quality Checks Before Synthesis
+# statistics.py
 
-Inspect candidate sequences for:
+This script calculates **median metadata values** from the training dataset.
 
-- valid amino acid alphabet
-- appropriate sequence length
-- absence of long repetitive motifs
-- acceptable predicted instability values
-- sufficient diversity between candidates
+These medians are used as conditioning values during sequence generation.
 
-Optional checks:
+Example values computed:
 
-- BLAST similarity search
-- signal peptide prediction
-- transmembrane domain prediction
+- molecular weight
+- aromaticity
+- isoelectric point
+- GRAVY index
+- instability index
 
 ---
 
-# Troubleshooting
+# Requirements
 
-## Decoder produces invalid amino acids
+Recommended environment:
 
-Ensure the amino acid mapping used in `decode_onehot_to_sequence()` matches the mapping used during training.
 
----
+Python 3.9+
+TensorFlow / Keras
+NumPy
+Pandas
+Scikit-learn
+SciPy
+joblib
 
-## Metadata scaler errors
 
-Verify that:
+Install dependencies:
 
-- `meta_scaler_7k.pkl` was generated during training.
-- metadata columns appear in the same order as training data.
 
----
+pip install numpy pandas scikit-learn tensorflow scipy joblib
 
-## Too few candidates pass the stability filter
-
-Possible solutions:
-
-- increase `n_per_anchor`
-- increase `sigma`
-- relax the stability threshold slightly
 
 ---
 
-## Too many similar sequences
+# Example Usage
 
-Increase the number of clusters used for diversity filtering.
+### Train Models
 
----
 
-# Conda Environment Example
+python cellulase_generator.py
 
-```
-conda create -n cellulase_env python=3.9 -y
-conda activate cellulase_env
 
-pip install numpy
-pip install pandas
-pip install scikit-learn
-pip install tensorflow==2.11.0
-pip install joblib
-pip install scipy
-```
+### Compute Metadata Statistics
 
-Adjust the TensorFlow version if necessary to match the version used when saving the trained models.
+
+python statistics.py
+
+
+### Run Guided Generation
+
+
+python phase_2.py
+
 
 ---
 
-# Reproducibility
+# Output
 
-For reproducibility, retain the following files:
+Generated candidates are saved as:
 
-```
-top_guided_candidates.csv
-top_guided_candidates.fasta
-all_stable_candidates_scored.csv
-encoder_7k.h5
-decoder_7k.h5
-predictor_7k.h5
-meta_scaler_7k.pkl
-```
+
+results/top_guided_candidates.csv
+results/top_guided_candidates.fasta
+
+
+These sequences are recommended for **experimental validation and synthesis**.
 
 ---
 
-# Scientific Limitations
+# Key Advantages
 
-The current pipeline optimizes sequence stability rather than catalytic activity.
+This pipeline enables:
 
-Future improvements may include:
+- Efficient exploration of protein sequence space
+- Guided generation around experimentally validated peptides
+- Stability-aware filtering
+- Diversity-aware candidate selection
 
-- training an activity predictor using experimentally measured activity data
-- retraining the predictor with new labeled results from synthesis experiments
-- comparing guided generation with random latent sampling strategies
+This significantly improves the probability of discovering **functionally active cellulases** within a limited synthesis budget.
 
 ---
 
 # License
 
-MIT License © 2024
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files to deal in the Software without restriction.
+MIT License
