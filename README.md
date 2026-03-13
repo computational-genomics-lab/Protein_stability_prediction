@@ -10,7 +10,7 @@ This approach allows efficient exploration of protein sequence space while prior
 
 # Repository Structure
 
-
+```
 .
 ├── cellulase_generator.py # Phase 1: Train models and generate initial sequences
 ├── phase_2.py # Phase 2: Guided sequence generation using experimental anchors
@@ -22,7 +22,7 @@ This approach allows efficient exploration of protein sequence space while prior
 │ └── meta_scaler_7k.pkl
 ├── experimental_peptides.csv # Experimentally validated cellulases
 └── results/ # Generated candidate sequences
-
+```
 
 ---
 
