@@ -5,8 +5,8 @@ A two-phase machine-learning pipeline for generating novel fungal cellulase sequ
 The pipeline was developed and executed in two sequential phases. Phase 1 was an exploratory screen using a pilot corpus that produced experimentally tested candidates. Phase 2 used those experimental results to anchor a larger, retrained model in latent space, producing a focused set of predicted-stable variants for synthesis.
 
 > **Data and model weights:**  
-> [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20594473.svg)](https://doi.org/10.5281/zenodo.20594473)  
-> Training corpora, trained model artefacts, and generated candidate files are deposited at the Zenodo record above. Download them before running either script.
+> [![DOI]](https://doi.org/10.5281/zenodo.20594473)  
+> Training corpora and generated candidate files are deposited at the Zenodo record above. Download them before running either script.
 
 ---
 
