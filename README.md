@@ -66,10 +66,6 @@ Download from [https://doi.org/10.5281/zenodo.20594473](https://doi.org/10.5281/
 |---|---|---|---|
 | `cellulase_positive_Phase1.csv` | 11.0 MB | `cellulase_generator.py` | Fungal cellulase training corpus (~3,845 sequences with physicochemical metadata) |
 | `cellulase_positive_Phase2.xlsx` | 861 kB | `phase2.py` | Experimentally validated anchor sequences (PF2, PF3) |
-| `encoder_7k.h5` | — | `phase2.py` | Trained CVAE encoder (Phase 2) |
-| `decoder_7k.h5` | — | `phase2.py` | Trained CVAE decoder (Phase 2) |
-| `predictor_7k.h5` | — | `phase2.py` | Trained CNN stability predictor (Phase 2) |
-| `meta_scaler_7k.pkl` | — | `phase2.py` | Fitted StandardScaler for metadata normalisation |
 | `generated_cellulase_candidates.xlsx` | 15 kB | — | Final Phase 2 candidate sequences (results) |
 
 > `meta_scaler_7k.pkl` must be reused without refitting. It was fitted on the Phase 2 training partition. Refitting it on any other data will shift the metadata embedding space and invalidate the anchor coordinates.
